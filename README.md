@@ -10,12 +10,14 @@ A command-line tool that parses Go module files (`go.mod`) and scans all depende
 - Verify if dependencies are actually present on disk
 - Handle replace directives and show replacement locations
 - **Scan all Go files in dependencies for specific command patterns**:
- - `.Command(`
- - `.RunCommand(`
- - `.Cmd(`
+  - `.Command(`
+  - `.RunCommand(`
+  - `.Cmd(`
 - **Extract and display the actual lines of code containing these patterns**
 - Generate a detailed summary of all matching files and code lines
 - Group and count occurrences by pattern type
+- **Skip test files (`*_test.go`) to focus on implementation code**
+- **Optionally skip official Go packages (`golang.org/*`)**
 
 ## Installation
 
@@ -36,6 +38,9 @@ go build -o cmdscanner
 
 # Scan a specific go.mod file
 ./cmdscanner -file /path/to/go.mod
+
+# Skip official Go packages (golang.org/*)
+./cmdscanner -skip-go-official
 ```
 
 ## Example Output
@@ -45,18 +50,22 @@ Module: github.com/example/myproject
 Go version: 1.20
 Module cache location: /home/user/go/pkg/mod
 Searching for command patterns: .Command(, .RunCommand(, .Cmd(
+Skipping test files (*_test.go)
+Skipping official Go packages (golang.org/*)
 
 Scanning dependencies for command patterns in Go files:
 ======================================================
+- golang.org/x/mod v0.12.0 (skipped - Go official package)
+
 - github.com/spf13/cobra v1.7.0
- Location: /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0
- Scanning for command patterns in Go files...
- Found 3 files with 12 command pattern occurrences
+  Location: /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0
+  Scanning for command patterns in Go files...
+  Found 3 files with 12 command pattern occurrences
 
 - github.com/urfave/cli/v2 v2.25.7 (indirect)
- Location: /home/user/go/pkg/mod/github.com/urfave/cli/v2@v2.25.7
- Scanning for command patterns in Go files...
- Found 2 files with 5 command pattern occurrences
+  Location: /home/user/go/pkg/mod/github.com/urfave/cli/v2@v2.25.7
+  Scanning for command patterns in Go files...
+  Found 2 files with 5 command pattern occurrences
 
 Detailed summary of all Go files containing command patterns:
 ===========================================================
@@ -68,20 +77,20 @@ Pattern summary:
 - .RunCommand(: 2 occurrences
 
 1. /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/command.go (8 occurrences)
-  Line 142 [.Command(]: rootCmd.Command("version", "Print the version number")
-  Line 157 [.Command(]: cmd := &Command{Use: "app"}
-  Line 203 [.Cmd(]: app.Cmd("init", "Initialize the application")
-  Line 245 [.RunCommand(]: err := cli.RunCommand(args)
-  Line 301 [.Command(]: subCmd := cmd.Command("serve", "Start the server")
-  Line 350 [.Command(]: helpCmd := rootCmd.Command("help", "Help about any command")
-  Line 412 [.Cmd(]: return app.Cmd("config", "Manage configuration")
-  Line 489 [.RunCommand(]: return cmd.RunCommand(context.Background())
+   Line 142 [.Command(]: rootCmd.Command("version", "Print the version number")
+   Line 157 [.Command(]: cmd := &Command{Use: "app"}
+   Line 203 [.Cmd(]: app.Cmd("init", "Initialize the application")
+   Line 245 [.RunCommand(]: err := cli.RunCommand(args)
+   Line 301 [.Command(]: subCmd := cmd.Command("serve", "Start the server")
+   Line 350 [.Command(]: helpCmd := rootCmd.Command("help", "Help about any command")
+   Line 412 [.Cmd(]: return app.Cmd("config", "Manage configuration")
+   Line 489 [.RunCommand(]: return cmd.RunCommand(context.Background())
 
 2. /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/cobra.go (4 occurrences)
-  Line 78 [.Command(]: NewCommand returns a new Command
-  Line 120 [.Cmd(]: c := root.Cmd("status", "Show status")
-  Line 156 [.Command(]: cmd := cobra.Command("serve", "Start the server")
-  Line 203 [.Cmd(]: return app.Cmd("version", "Print version information")
+   Line 78 [.Command(]: NewCommand returns a new Command
+   Line 120 [.Cmd(]: c := root.Cmd("status", "Show status")
+   Line 156 [.Command(]: cmd := cobra.Command("serve", "Start the server")
+   Line 203 [.Cmd(]: return app.Cmd("version", "Print version information")
 ```
 
 ## Technical Notes
@@ -94,6 +103,14 @@ The tool specifically looks for these command patterns:
 - `.Cmd(` - A shorter variant used in many libraries
 
 These patterns help identify where and how commands are defined and used in Go code, which is particularly useful for understanding command-line applications and their structure.
+
+### Test File Exclusion
+
+The tool skips all files ending with `_test.go` to focus on implementation code rather than test code. This helps reduce noise in the results, as test files often contain different usage patterns than the actual implementation.
+
+### Go Official Package Exclusion
+
+With the `-skip-go-official` flag, the tool will skip scanning packages from the Go project itself (those with paths starting with `golang.org/`). This helps focus the results on third-party libraries that implement command patterns, which is typically more useful for analysis.
 
 ### Go Module Cache
 
@@ -141,6 +158,8 @@ The tool distinguishes between these cases and shows the appropriate location.
 The tool recursively scans all `.go` files in each dependency's directory:
 
 - It skips directories like `.git`, `testdata`, and `vendor`
+- It skips test files (`*_test.go`)
+- It optionally skips official Go packages (`golang.org/*`)
 - It searches for the specified command patterns in each Go file
 - It extracts and displays the actual lines of code containing these patterns
 - It provides a detailed summary of all matching files and code lines at the end
@@ -152,12 +171,12 @@ To add more command patterns to search for, modify the `CommandPatterns` slice i
 
 ```go
 var CommandPatterns = []string{
-   `.Command(`,
-   `.RunCommand(`,
-   `.Cmd(`,
-   // Add more patterns here
-   `.NewCommand(`,
-   `.AddCommand(`,
+    `.Command(`,
+    `.RunCommand(`,
+    `.Cmd(`,
+    // Add more patterns here
+    `.NewCommand(`,
+    `.AddCommand(`,
 }
 ```
 

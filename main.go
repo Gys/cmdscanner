@@ -59,8 +59,8 @@ func getPackageInstallPath(modulePath, version string, moduleCachePath string) s
 		log.Printf("Warning: Could not encode module path %s: %v", modulePath, err)
 		encodedPath = modulePath
 	}
-	// For the version, we need to handle the "v" prefix and any "+incompatible" suffix
 
+	// For the version, we need to handle the "v" prefix and any "+incompatible" suffix
 	cleanVersion := strings.TrimSuffix(version, "+incompatible")
 
 	// Construct the path
@@ -95,8 +95,8 @@ func findCommandPatternsInGoFiles(rootPath string, patterns []string) ([]FileMat
 			return nil
 		}
 
-		// Only process .go files
-		if !strings.HasSuffix(d.Name(), ".go") {
+		// Only process .go files that are not test files
+		if !strings.HasSuffix(d.Name(), ".go") || strings.HasSuffix(d.Name(), "_test.go") {
 			return nil
 		}
 
@@ -144,9 +144,15 @@ func findCommandPatternsInGoFiles(rootPath string, patterns []string) ([]FileMat
 	return matches, err
 }
 
+// isGoOfficialPackage checks if a package is from the Go project itself
+func isGoOfficialPackage(packagePath string) bool {
+	return strings.HasPrefix(packagePath, "golang.org/")
+}
+
 func main() {
 	// Define command-line flags
 	goModPath := flag.String("file", "go.mod", "Path to the go.mod file to parse")
+	skipGoOfficial := flag.Bool("skip-go-official", false, "Skip packages from golang.org")
 	flag.Parse()
 
 	// Check if the file exists
@@ -176,7 +182,12 @@ func main() {
 	fmt.Printf("Module: %s\n", file.Module.Mod.Path)
 	fmt.Printf("Go version: %s\n", file.Go.Version)
 	fmt.Printf("Module cache location: %s\n", moduleCachePath)
-	fmt.Printf("Searching for command patterns: %s\n\n", strings.Join(CommandPatterns, ", "))
+	fmt.Printf("Searching for command patterns: %s\n", strings.Join(CommandPatterns, ", "))
+	fmt.Printf("Skipping test files (*_test.go)\n")
+	if *skipGoOfficial {
+		fmt.Printf("Skipping official Go packages (golang.org/*)\n")
+	}
+	fmt.Println()
 
 	// Store all files containing command patterns
 	var allMatches []FileMatch
@@ -184,20 +195,30 @@ func main() {
 	// Process all dependencies
 	fmt.Println("Scanning dependencies for command patterns in Go files:")
 	fmt.Println("======================================================")
+
 	for _, req := range file.Require {
+		// Skip Go official packages if requested
+		if *skipGoOfficial && isGoOfficialPackage(req.Mod.Path) {
+			fmt.Printf("- %s %s (skipped - Go official package)\n\n", req.Mod.Path, req.Mod.Version)
+			continue
+		}
+
 		installPath := getPackageInstallPath(req.Mod.Path, req.Mod.Version, moduleCachePath)
 		exists := checkPackageExists(installPath)
+
 		indirectStr := ""
 		if req.Indirect {
 			indirectStr = " (indirect)"
 		}
+
 		fmt.Printf("- %s %s%s\n", req.Mod.Path, req.Mod.Version, indirectStr)
+
 		if !exists {
 			fmt.Printf("  Status: NOT FOUND - Skipping scan\n\n")
 			continue
 		}
-		fmt.Printf("  Location: %s\n", installPath)
 
+		fmt.Printf("  Location: %s\n", installPath)
 		fmt.Printf("  Scanning for command patterns in Go files...\n")
 
 		// Find all .go files containing command patterns
@@ -211,7 +232,6 @@ func main() {
 			for _, match := range matches {
 				totalLines += len(match.Lines)
 			}
-
 			fmt.Printf("  Found %d files with %d command pattern occurrences\n",
 				len(matches), totalLines)
 			allMatches = append(allMatches, matches...)
@@ -224,6 +244,12 @@ func main() {
 		fmt.Println("\nScanning replaced modules:")
 		fmt.Println("=========================")
 		for _, rep := range file.Replace {
+			// Skip Go official packages if requested
+			if *skipGoOfficial && isGoOfficialPackage(rep.New.Path) {
+				fmt.Printf("- %s %s => %s %s (skipped - Go official package)\n\n",
+					rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
+				continue
+			}
 
 			fmt.Printf("- %s %s => %s %s\n",
 				rep.Old.Path, rep.Old.Version,
@@ -266,7 +292,6 @@ func main() {
 				for _, match := range matches {
 					totalLines += len(match.Lines)
 				}
-
 				fmt.Printf("  Found %d files with %d command pattern occurrences\n",
 					len(matches), totalLines)
 				allMatches = append(allMatches, matches...)
