@@ -146,13 +146,13 @@ func findCommandPatternsInGoFiles(rootPath string, patterns []string) ([]FileMat
 
 // isGoOfficialPackage checks if a package is from the Go project itself
 func isGoOfficialPackage(packagePath string) bool {
-	return strings.HasPrefix(packagePath, "golang.org/")
+	return strings.HasPrefix(packagePath, "golang.org/") || strings.HasPrefix(packagePath, "google.golang.org/")
 }
 
 func main() {
 	// Define command-line flags
 	goModPath := flag.String("file", "go.mod", "Path to the go.mod file to parse")
-	skipGoOfficial := flag.Bool("skip-go-official", false, "Skip packages from golang.org")
+	includeGoOfficial := flag.Bool("include-go-official", false, "Include packages from *.golang.org")
 	flag.Parse()
 
 	// Check if the file exists
@@ -184,8 +184,8 @@ func main() {
 	fmt.Printf("Module cache location: %s\n", moduleCachePath)
 	fmt.Printf("Searching for command patterns: %s\n", strings.Join(CommandPatterns, ", "))
 	fmt.Printf("Skipping test files (*_test.go)\n")
-	if *skipGoOfficial {
-		fmt.Printf("Skipping official Go packages (golang.org/*)\n")
+	if *includeGoOfficial {
+		fmt.Printf("Including official Go packages (*.golang.org/*)\n")
 	}
 	fmt.Println()
 
@@ -198,7 +198,7 @@ func main() {
 
 	for _, req := range file.Require {
 		// Skip Go official packages if requested
-		if *skipGoOfficial && isGoOfficialPackage(req.Mod.Path) {
+		if !*includeGoOfficial && isGoOfficialPackage(req.Mod.Path) {
 			fmt.Printf("- %s %s (skipped - Go official package)\n\n", req.Mod.Path, req.Mod.Version)
 			continue
 		}
@@ -245,7 +245,7 @@ func main() {
 		fmt.Println("=========================")
 		for _, rep := range file.Replace {
 			// Skip Go official packages if requested
-			if *skipGoOfficial && isGoOfficialPackage(rep.New.Path) {
+			if !*includeGoOfficial && isGoOfficialPackage(rep.New.Path) {
 				fmt.Printf("- %s %s => %s %s (skipped - Go official package)\n\n",
 					rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
 				continue
