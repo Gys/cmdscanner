@@ -149,6 +149,33 @@ func isGoOfficialPackage(packagePath string) bool {
 	return strings.HasPrefix(packagePath, "golang.org/") || strings.HasPrefix(packagePath, "google.golang.org/")
 }
 
+// findGoModInParentDirs searches for a go.mod file in the current directory
+// and all parent directories, returning the path to the first one found.
+// If no go.mod file is found, it returns an empty string.
+func findGoModInParentDirs() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+
+	for {
+		goModPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return goModPath
+		}
+
+		// Move to parent directory
+		parentDir := filepath.Dir(dir)
+		// If we've reached the root directory and haven't found go.mod
+		if parentDir == dir {
+			break
+		}
+		dir = parentDir
+	}
+
+	return ""
+}
+
 func main() {
 	// Define command-line flags
 	goModPath := flag.String("file", "go.mod", "Path to the go.mod file to parse")
@@ -157,7 +184,13 @@ func main() {
 
 	// Check if the file exists
 	if _, err := os.Stat(*goModPath); os.IsNotExist(err) {
-		log.Fatalf("Error: go.mod file not found at %s", *goModPath)
+		// Try to find go.mod in parent directories
+		if foundGoMod := findGoModInParentDirs(); foundGoMod != "" {
+			*goModPath = foundGoMod
+			fmt.Printf("Found go.mod in parent directory: %s\n", *goModPath)
+		} else {
+			log.Fatalf("Error: go.mod file not found at %s or in any parent directory", *goModPath)
+		}
 	}
 
 	// Read the go.mod file
