@@ -301,8 +301,10 @@ func main() {
 	}
 
 	// Print detailed summary of all files containing command patterns
-	fmt.Println("\nSummary:")
-	if len(allMatches) > 0 {
+	fmt.Println("Results:")
+	if len(allMatches) == 0 {
+		fmt.Printf("No command patterns found in any files.\n\n")
+	} else {
 		totalOccurrences := 0
 		for _, fileMatch := range allMatches {
 			totalOccurrences += len(fileMatch.Lines)
