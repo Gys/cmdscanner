@@ -219,6 +219,8 @@ func main() {
 	fmt.Printf("Skipping test files (*_test.go)\n")
 	if *includeGoOfficial {
 		fmt.Printf("Including official Go packages (*.golang.org/*)\n")
+	} else {
+		fmt.Printf("Skipping official Go packages (*.golang.org/*)\n")
 	}
 	fmt.Println()
 
@@ -226,13 +228,10 @@ func main() {
 	var allMatches []FileMatch
 
 	// Process all dependencies
-	fmt.Println("Scanning dependencies for command patterns in Go files:")
-	fmt.Println("======================================================")
-
 	for _, req := range file.Require {
 		// Skip Go official packages if requested
 		if !*includeGoOfficial && isGoOfficialPackage(req.Mod.Path) {
-			fmt.Printf("- %s %s (skipped - Go official package)\n\n", req.Mod.Path, req.Mod.Version)
+			// fmt.Printf("- %s %s (skipped - Go official package)\n\n", req.Mod.Path, req.Mod.Version)
 			continue
 		}
 
@@ -244,57 +243,33 @@ func main() {
 			indirectStr = " (indirect)"
 		}
 
-		fmt.Printf("- %s %s%s\n", req.Mod.Path, req.Mod.Version, indirectStr)
-
 		if !exists {
-			fmt.Printf("  Status: NOT FOUND - Skipping scan\n\n")
+			fmt.Printf("- %s %s%s\n", req.Mod.Path, req.Mod.Version, indirectStr)
+			fmt.Printf("  Location not found (%s)\n\n", installPath)
 			continue
 		}
-
-		fmt.Printf("  Location: %s\n", installPath)
-		fmt.Printf("  Scanning for command patterns in Go files...\n")
 
 		// Find all .go files containing command patterns
 		matches, err := findCommandPatternsInGoFiles(installPath, CommandPatterns)
 		if err != nil {
-			fmt.Printf("  Error scanning files: %v\n", err)
-		} else if len(matches) == 0 {
-			fmt.Printf("  No files containing command patterns found\n")
+			fmt.Printf("- %s %s%s\n", req.Mod.Path, req.Mod.Version, indirectStr)
+			fmt.Printf("  Error scanning: %v\n\n", err)
 		} else {
-			totalLines := 0
-			for _, match := range matches {
-				totalLines += len(match.Lines)
-			}
-			fmt.Printf("  Found %d files with %d command pattern occurrences\n",
-				len(matches), totalLines)
 			allMatches = append(allMatches, matches...)
 		}
-		fmt.Println()
+		// fmt.Println()
 	}
 
 	// Process replace directives
 	if len(file.Replace) > 0 {
-		fmt.Println("\nScanning replaced modules:")
-		fmt.Println("=========================")
 		for _, rep := range file.Replace {
-			// Skip Go official packages if requested
-			if !*includeGoOfficial && isGoOfficialPackage(rep.New.Path) {
-				fmt.Printf("- %s %s => %s %s (skipped - Go official package)\n\n",
-					rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
-				continue
-			}
-
-			fmt.Printf("- %s %s => %s %s\n",
-				rep.Old.Path, rep.Old.Version,
-				rep.New.Path, rep.New.Version)
-
 			var replacementPath string
-			var isLocalPath bool
+			// var isLocalPath bool
 
 			if rep.New.Version == "" {
 				// Local replacement (filesystem path)
 				replacementPath = rep.New.Path
-				isLocalPath = true
+				// isLocalPath = true
 			} else {
 				// Module replacement
 				replacementPath = getPackageInstallPath(rep.New.Path, rep.New.Version, moduleCachePath)
@@ -302,49 +277,38 @@ func main() {
 
 			exists := checkPackageExists(replacementPath)
 			if !exists {
-				fmt.Printf("  Status: NOT FOUND - Skipping scan\n\n")
+				fmt.Printf("- %s %s => %s %s\n", rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
+				fmt.Printf("  Location not found (%s)\n\n", replacementPath)
 				continue
 			}
 
-			if isLocalPath {
-				fmt.Printf("  Location: %s (local filesystem)\n", replacementPath)
-			} else {
-				fmt.Printf("  Location: %s\n", replacementPath)
-			}
-
-			fmt.Printf("  Scanning for command patterns in Go files...\n")
+			// if isLocalPath {
+			// 	fmt.Printf("  Location: %s (local filesystem)\n", replacementPath)
+			// } else {
+			// 	fmt.Printf("  Location: %s\n", replacementPath)
+			// }
 
 			// Find all .go files containing command patterns
 			matches, err := findCommandPatternsInGoFiles(replacementPath, CommandPatterns)
 			if err != nil {
-				fmt.Printf("  Error scanning files: %v\n", err)
-			} else if len(matches) == 0 {
-				fmt.Printf("  No files containing command patterns found\n")
+				fmt.Printf("- %s %s => %s %s\n", rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
+				fmt.Printf("  Error scanning: %v\n\n", err)
 			} else {
-				totalLines := 0
-				for _, match := range matches {
-					totalLines += len(match.Lines)
-				}
-				fmt.Printf("  Found %d files with %d command pattern occurrences\n",
-					len(matches), totalLines)
 				allMatches = append(allMatches, matches...)
 			}
-			fmt.Println()
+			// fmt.Println()
 		}
 	}
 
 	// Print detailed summary of all files containing command patterns
-	fmt.Println("\nDetailed summary of all Go files containing command patterns:")
-	fmt.Println("===========================================================")
-	if len(allMatches) == 0 {
-		fmt.Println("No files found containing command patterns.")
-	} else {
+	fmt.Println("\nSummary:")
+	if len(allMatches) > 0 {
 		totalOccurrences := 0
 		for _, fileMatch := range allMatches {
 			totalOccurrences += len(fileMatch.Lines)
 		}
 
-		fmt.Printf("Found %d command pattern occurrences in %d files:\n\n", totalOccurrences, len(allMatches))
+		// fmt.Printf("Found %d command pattern occurrences in %d files:\n\n", totalOccurrences, len(allMatches))
 
 		// Group matches by pattern
 		patternCounts := make(map[string]int)
@@ -353,13 +317,6 @@ func main() {
 				patternCounts[line.Pattern]++
 			}
 		}
-
-		// Print pattern summary
-		fmt.Println("Pattern summary:")
-		for pattern, count := range patternCounts {
-			fmt.Printf("- %s: %d occurrences\n", pattern, count)
-		}
-		fmt.Println()
 
 		// Print detailed file matches
 		for i, fileMatch := range allMatches {
