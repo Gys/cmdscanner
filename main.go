@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
+
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
@@ -191,7 +193,11 @@ func main() {
 	goModPath := flag.String("file", "go.mod", "Path to the go.mod file to parse")
 	includeGoOfficial := flag.Bool("include-go-official", false, "Include packages from *.golang.org")
 	skipPackagesFlag := flag.String("skip", "", "Comma-separated list of packages to skip scanning")
+	noColor := flag.Bool("no-color", false, "Disable color output")
 	flag.Parse()
+
+	// Apply the setting
+	color.NoColor = *noColor
 
 	// Parse the skip packages flag
 	skipPackages := []string{}
@@ -336,7 +342,7 @@ func main() {
 	}
 
 	// Print detailed summary of all files containing command patterns
-	fmt.Println("Results:")
+	fmt.Printf("Results:\n\n")
 	if len(allMatches) == 0 {
 		fmt.Printf("No command patterns found in any files.\n\n")
 	} else {
@@ -345,7 +351,7 @@ func main() {
 			totalOccurrences += len(fileMatch.Lines)
 		}
 
-		// fmt.Printf("Found %d command pattern occurrences in %d files:\n\n", totalOccurrences, len(allMatches))
+		fmt.Printf("Found %d command pattern occurrences in %d files:\n\n", totalOccurrences, len(allMatches))
 
 		// Group matches by pattern
 		patternCounts := make(map[string]int)
@@ -356,10 +362,11 @@ func main() {
 		}
 
 		// Print detailed file matches
-		for i, fileMatch := range allMatches {
-			fmt.Printf("%d. %s (%d occurrences)\n", i+1, fileMatch.FilePath, len(fileMatch.Lines))
+		style := color.New(color.FgHiYellow)
+		for _, fileMatch := range allMatches {
 			for _, line := range fileMatch.Lines {
-				fmt.Printf("   Line %d [%s]: %s\n", line.LineNumber, line.Pattern, line.Content)
+				fmt.Printf("%s:%d\n", fileMatch.FilePath, line.LineNumber)
+				style.Printf("%s\n", strings.TrimSpace(line.Content))
 			}
 			fmt.Println()
 		}
