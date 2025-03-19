@@ -13,26 +13,22 @@ See this discussion on Reddit: [Someone copied our GitHub project, made it look 
 ## Features
 
 - Parse `go.mod` files to extract module information
-- List all direct and indirect dependencies
-- Show the exact filesystem location where each dependency is installed
-- Verify if dependencies are actually present on disk
-- Handle replace directives and show replacement locations
-- **Scan all Go files in dependencies for specific command patterns**:
+- Scan all Go files in dependencies for specific command patterns:
   - `.Command(`
   - `.RunCommand(`
   - `.Cmd(`
-- **Extract and display the actual lines of code containing these patterns**
-- Generate a detailed summary of all matching files and code lines
-- Group and count occurrences by pattern type
-- **Skip test files (`*_test.go`) to focus on implementation code**
-- **Optionally skip official Go packages (`golang.org/*`)**
-- **Optionally skip user-specified packages**
+- Extract and display the actual lines of code containing these patterns
+- Handle replace directives 
+- Skip test files (`*_test.go`) to focus on implementation code
+- Optionally skip official Go packages (`golang.org/*`)
+- Optionally skip user-specified packages
+- Optionally no color output
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cmdscanner
+git clone https://github.com/Gys/cmdscanner
 cd cmdscanner
 
 # Build the application
@@ -52,7 +48,10 @@ go build -o cmdscanner
 ./cmdscanner -include-go-official
 
 # Skip specific packages (comma-separated list)
-./cmdscanner -skip github.com/spf13/cobra,github.com/pkg/errors
+./cmdscanner -skip github.com/modernc.org/libc,github.com/pkg/errors
+
+# By default color output is enabled
+./cmdscanner -no-color
 ```
 
 ## Example Output
@@ -64,24 +63,18 @@ Module cache location: /home/user/go/pkg/mod
 Searching for command patterns: .Command(, .RunCommand(, .Cmd(
 Skipping test files (*_test.go)
 Skipping official Go packages (golang.org/*)
-Skipping user-specified packages: github.com/spf13/cobra, github.com/pkg/errors
+Skipping user-specified packages: github.com/pkg/errors
 
 Summary:
 
-1. /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/command.go (8 occurrences)
-   Line 142 [.Command(]: rootCmd.Command("version", "Print the version number")
-   Line 157 [.Command(]: cmd := &Command{Use: "app"}
-   Line 203 [.Cmd(]: app.Cmd("init", "Initialize the application")
-   Line 245 [.RunCommand(]: err := cli.RunCommand(args)
-   Line 301 [.Command(]: subCmd := cmd.Command("serve", "Start the server")
-   Line 350 [.Command(]: helpCmd := rootCmd.Command("help", "Help about any command")
-   Line 412 [.Cmd(]: return app.Cmd("config", "Manage configuration")
-   Line 489 [.RunCommand(]: return cmd.RunCommand(context.Background())
+/home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/command.go:142
+rootCmd.Command("version", "Print the version number")
 
-2. /home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/cobra.go (3 occurrences)
-   Line 120 [.Cmd(]: c := root.Cmd("status", "Show status")
-   Line 156 [.Command(]: cmd := cobra.Command("serve", "Start the server")
-   Line 203 [.Cmd(]: return app.Cmd("version", "Print version information")
+/home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/command.go:157
+cmd := &Command{Use: "app"}
+
+/home/user/go/pkg/mod/github.com/spf13/cobra@v1.7.0/cobra.go:120
+c := root.Cmd("status", "Show status")
 ```
 
 ## Technical Notes
@@ -109,6 +102,10 @@ With the `-include-go-official` flag, the tool will include scanning packages fr
 
 Use the `-skip` flag to specify a comma-separated list of packages to skip during scanning.
 
+### Colored output
+
+By default the code lines are colored yellow. Use the `-no-color` flag to disble.
+
 ### Go Module Cache
 
 Go stores downloaded packages in a central module cache. The location of this cache is determined by:
@@ -130,7 +127,7 @@ Module paths in the filesystem are encoded to handle special characters:
 - The '!' character is converted to '!!'
 - Other special characters may also be encoded
 
-Our tool handles this encoding automatically using Go's `module.EscapePath` function.
+The tool handles this encoding automatically using Go's `module.EscapePath` function.
 
 ### Version Handling
 
