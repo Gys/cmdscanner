@@ -149,6 +149,16 @@ func isGoOfficialPackage(packagePath string) bool {
 	return strings.HasPrefix(packagePath, "golang.org/") || strings.HasPrefix(packagePath, "google.golang.org/")
 }
 
+// shouldSkipPackage checks if a package should be skipped based on user-defined patterns
+func shouldSkipPackage(packagePath string, skipPackages []string) bool {
+	for _, skipPattern := range skipPackages {
+		if strings.Contains(packagePath, skipPattern) {
+			return true
+		}
+	}
+	return false
+}
+
 // findGoModInParentDirs searches for a go.mod file in the current directory
 // and all parent directories, returning the path to the first one found.
 // If no go.mod file is found, it returns an empty string.
@@ -180,7 +190,17 @@ func main() {
 	// Define command-line flags
 	goModPath := flag.String("file", "go.mod", "Path to the go.mod file to parse")
 	includeGoOfficial := flag.Bool("include-go-official", false, "Include packages from *.golang.org")
+	skipPackagesFlag := flag.String("skip", "", "Comma-separated list of packages to skip scanning")
 	flag.Parse()
+
+	// Parse the skip packages flag
+	skipPackages := []string{}
+	if *skipPackagesFlag != "" {
+		skipPackages = strings.Split(*skipPackagesFlag, ",")
+		for i, pkg := range skipPackages {
+			skipPackages[i] = strings.TrimSpace(pkg)
+		}
+	}
 
 	// Check if the file exists
 	if _, err := os.Stat(*goModPath); os.IsNotExist(err) {
@@ -222,6 +242,9 @@ func main() {
 	} else {
 		fmt.Printf("Skipping official Go packages (*.golang.org/*)\n")
 	}
+	if len(skipPackages) > 0 {
+		fmt.Printf("Skipping user-specified packages: %s\n", strings.Join(skipPackages, ", "))
+	}
 	fmt.Println()
 
 	// Store all files containing command patterns
@@ -232,6 +255,12 @@ func main() {
 		// Skip Go official packages if requested
 		if !*includeGoOfficial && isGoOfficialPackage(req.Mod.Path) {
 			// fmt.Printf("- %s %s (skipped - Go official package)\n\n", req.Mod.Path, req.Mod.Version)
+			continue
+		}
+
+		// Skip user-specified packages
+		if shouldSkipPackage(req.Mod.Path, skipPackages) {
+			// fmt.Printf("- %s %s (skipped - user-specified)\n\n", req.Mod.Path, req.Mod.Version)
 			continue
 		}
 
@@ -263,6 +292,12 @@ func main() {
 	// Process replace directives
 	if len(file.Replace) > 0 {
 		for _, rep := range file.Replace {
+			// Skip user-specified packages
+			if shouldSkipPackage(rep.Old.Path, skipPackages) || shouldSkipPackage(rep.New.Path, skipPackages) {
+				// fmt.Printf("- %s %s => %s %s (skipped - user-specified)\n\n", rep.Old.Path, rep.Old.Version, rep.New.Path, rep.New.Version)
+				continue
+			}
+
 			var replacementPath string
 			// var isLocalPath bool
 

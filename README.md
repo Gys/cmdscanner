@@ -26,6 +26,7 @@ See this discussion on Reddit: [Someone copied our GitHub project, made it look 
 - Group and count occurrences by pattern type
 - **Skip test files (`*_test.go`) to focus on implementation code**
 - **Optionally skip official Go packages (`golang.org/*`)**
+- **Optionally skip user-specified packages**
 
 ## Installation
 
@@ -49,6 +50,9 @@ go build -o cmdscanner
 
 # Also include official Go packages (*.golang.org/*)
 ./cmdscanner -include-go-official
+
+# Skip specific packages (comma-separated list)
+./cmdscanner -skip github.com/spf13/cobra,github.com/pkg/errors
 ```
 
 ## Example Output
@@ -60,6 +64,7 @@ Module cache location: /home/user/go/pkg/mod
 Searching for command patterns: .Command(, .RunCommand(, .Cmd(
 Skipping test files (*_test.go)
 Skipping official Go packages (golang.org/*)
+Skipping user-specified packages: github.com/spf13/cobra, github.com/pkg/errors
 
 Summary:
 
@@ -99,6 +104,10 @@ The tool skips all files ending with `_test.go` to focus on implementation code.
 ### Go Official Package Inclusion
 
 With the `-include-go-official` flag, the tool will include scanning packages from the Go project itself (those with paths starting with `golang.org/`).
+
+### Package Skipping
+
+Use the `-skip` flag to specify a comma-separated list of packages to skip during scanning.
 
 ### Go Module Cache
 
